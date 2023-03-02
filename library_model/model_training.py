@@ -10,7 +10,8 @@ class Model_training(nn.Module):
         self.model = model
         self.opt =opt
         self.loss = loss
-        self.scheuduler = scheduler
+        self.scheduler = scheduler
+
     
 
     def forward(self, epochs, data):
@@ -55,7 +56,7 @@ class Model_training(nn.Module):
         self.model.eval()
         text_instance_encoded = self.model.autoregression(sample_input, 62)
         if self.tokenizer is not None:
-            output = self.tokenizer.text_decoding(text_instance_encoded)
+            output = self.data.tokenizer.text_decoding(text_instance_encoded)
         else:
             output = text_instance_encoded
         return output
