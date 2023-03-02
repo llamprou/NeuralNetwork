@@ -4,56 +4,63 @@ from data import text as txt
 import time
 
 
-
 class Model_training(nn.Module):
-    def __init__(self, model, opt, loss):
+    def __init__(self, model, opt, loss, scheduler):
         super().__init__()
         self.model = model
         self.opt =opt
         self.loss = loss
+        self.scheuduler = scheduler
     
 
-    def run_transformer_epoch(self, train_dataloader, tokenizer, device):
+    def forward(self, epochs, data):
+        self.data = data
+        for epoch in range(epochs):
+            dt, epoch_loss = self.run_transformer_epoch()
+            print(f"Epoch: {epoch} -- time: {dt} -- loss = {epoch_loss}\n")
+
+            #output = self.evaluate_transformer_output(tokenizer, sample_input)
+            #print(output)
+        self.data = None
+
+
+    def run_transformer_epoch(self):
         self.model.train()
-        train_iterator = iter(train_dataloader)
+        train_iterator = iter(self.data.train_dataloader)
         total_loss =0
         t1= time.time()
+        k = 0
         for input_batch, output_batch in train_iterator:
-            _, out_prob = self.model(input_batch)
-
-            #Convert output words from integers to one-hot vectors ---I could do this separately and define a dictionary to increase speed
-            expectation = torch.tensor([[tokenizer.token_onehot[int(seq_elem)] for seq_elem in batch_elem] for batch_elem in output_batch], dtype=torch.float).to(device)
-
-            loss = self.loss(out_prob, expectation).to(device)
-            total_loss += loss
+            t_prev = time.time()
+            out_prob = self.model(*input_batch)
             
-            loss.backward()
-            self.opt.step()
+            loss = self.loss(out_prob.view(-1,out_prob.size(-1)), output_batch.reshape(-1))
+            total_loss += loss.item()
+            
             self.opt.zero_grad()
-        if self.scheduler is not None:
-            self.scheduler.step()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), 0.5) #prevents blow-ups of backpropagated derivatives
+            self.opt.step()
+            
+            k+=1
+            lr = self.scheduler.get_last_lr()[0]
+            if k%100 ==0:
+              print(f"Batch {k} -- lr = {lr} -- time = {time.time()-t_prev} -- loss {loss}")
+        self.scheduler.step()
         t2= time.time() 
         return t2-t1, total_loss   
 
 
-
-    def evaluate_transformer_output(self, tokenizer, sample_input):
+    def evaluate_transformer_output(self, sample_input):
         self.model.eval()
         text_instance_encoded = self.model.autoregression(sample_input, 62)
-        if tokenizer is not None:
-            output = tokenizer.text_decoding(text_instance_encoded)
+        if self.tokenizer is not None:
+            output = self.tokenizer.text_decoding(text_instance_encoded)
         else:
             output = text_instance_encoded
         return output
     
 
-    def fit_transformer(self, epochs, train_dataloader, test_dataloader=None, tokenizer = None, sample_input=None, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
-        for epoch in range(epochs):
-            dt, epoch_loss = self.run_transformer_epoch(train_dataloader, tokenizer, device)
-            print(f"Epoch: {epoch} -- time: {dt} -- loss = {epoch_loss}\n")
-
-            output = self.evaluate_transformer_output(tokenizer, sample_input)
-            print(output)
 
 
             

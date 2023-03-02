@@ -4,8 +4,97 @@ import random
 
 
 
+#------------------------------------------------------------------------------------
+#CLASS FOR STORING INPUT TEXT ITERATOR
+#------------------------------------------------------------------------------------
+class Data:
+    tokenizer = None
+    train_dataloader= None
+    test_dataloader = None
+    sample_input = None
 
-#Building an iterator over minibatches of inputed text after tensor encoding
+    def encode(self, input):
+      if self.tokenizer is not None:
+        return self.tokenizer.text_encoding(input)
+      else:
+        print("No tokenizer selection")
+
+    def decode(self, input):
+      if self.tokenizer is not None:
+        return self.tokenizer.text_decoding(input)
+      else:
+        print("No tokenizer selection")
+
+
+
+#------------------------------------------------------------------------------------
+#HELPER FUNCTIONS FOR PROCESSING INPUT TEXT ITERATOR
+#------------------------------------------------------------------------------------
+def process_data(train_iter, coders_cls, state, network = "transformer"):
+    tr = state.training
+    coders = coders_cls(train_iter)  #generates vocab, contains tokenizer, text encoders and decoders
+    text_data = " ".join(list(item for item in train_iter))  #merges text items of Wikitext2 generator to form single text
+    train_data = coders.text_encoding(text_data).view(-1).to(state.device)  #encodes text into flat tensor and sends it to device
+    return coders, get_dataloader(train_data, tr.seq_length, tr.batch_size, network) 
+
+def get_dataloader(data, seq_length, batch_size, network):
+    data = data[:(len(data)//seq_length)*seq_length].view(-1,seq_length) #organizes flat data tensor to fixed-length sequences
+    dl = get_encoder_dataloader(data, data, batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data, data, batch_size, shuffle_batch=True)
+    return dl 
+
+
+
+#------------------------------------------------------------------------------------
+#HELPER FUNCTIONS FOR GETTING TRANSFORMER DATALOADERS
+#------------------------------------------------------------------------------------
+
+#transformer dataloader
+def get_tranformer_dataloader(*args, **kwargs):
+  generator = Dataloader_iter(*args, **kwargs)
+  class new_generator():
+    def __init__(self, generator):
+      self.generator = generator
+      self.len = len(generator)
+    
+    def __iter__(self):
+      self.iter_idx = 0
+      iterator = iter(self.generator)
+      while self.iter_idx < self.len:
+        x,y = next(iterator)
+        yield ([x, y[:, :-1]], y[:, 1:])
+        self.iter_idx +=1
+    def __len__(self):
+      return self.len
+
+  return new_generator(generator)
+
+
+  #encoder dataloader
+def get_encoder_dataloader(*args, **kwargs):
+  generator = Dataloader_iter(*args, **kwargs)
+  class new_generator():
+    def __init__(self, generator):
+      self.generator = generator
+      self.len = len(generator)
+    
+    def __iter__(self):
+      self.iter_idx = 0
+      iterator = iter(self.generator)
+      while self.iter_idx < self.len:
+        _,y = next(iterator)
+        yield ([y[:, :-1]], y[:, 1:])
+        self.iter_idx +=1
+    def __len__(self):
+      return self.len
+
+  return new_generator(generator)
+
+
+
+#------------------------------------------------------------------------------------
+#GENERIC DATALOADER CLASS
+#------------------------------------------------------------------------------------
+
 class Dataloader_iter(object):
   def __init__(self, input, output, batch_size, shuffle_batch=False, inp_transformation=None, out_transformation=None, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
     if inp_transformation is not None:
@@ -38,27 +127,4 @@ class Dataloader_iter(object):
       
  
 
-#transformer dataloader
-def get_tranformer_dataloader(*args, **kwargs):
-  generator = Dataloader_iter(*args, **kwargs)
-  class new_generator():
-    def __init__(self, generator):
-      self.generator = generator
-      self.len = len(generator)
-    
-    def __iter__(self):
-      self.iter_idx = 0
-      iterator = iter(self.generator)
-      while self.iter_idx < self.len:
-        x,y = next(iterator)
-        yield ([x, y[:, :-1]], y[:, 1:])
-        self.iter_idx +=1
-    def __len__(self):
-      return self.len
-
-  return new_generator(generator)
-
-
-
-#class for reading text file inputs and saving text outputs
 

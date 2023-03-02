@@ -7,54 +7,49 @@ import pandas as pd
 import copy
 import random
 import torch.optim as optim
-from library_model import model_training as mt
 from library_model import layers as lay
 import copy
 
 
-#-----------------------------------------------------------------------------------
-#generate standard models 
-def get_StandardFeedforward(dims_list, lr, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
-    hyper_param = [(dims_list[k], dims_list[k+1], True, True) for k in range(len(dims_list)-1)]
-    model = lay.FeedForward(hyper_param).to(device)
-    opt = optim.SGD(model.parameters(), lr)
-    return model, opt
-
-def get_SkipFeedforward(dims_list, lr, device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
-    hyper_param = [(dims_list[k], dims_list[k+1], True, True) for k in range(len(dims_list)-1)]
-    model = lay.SkipFeedForward(hyper_param).to(device)
-    opt = optim.SGD(model.parameters(), lr)
-    return model, opt
-
-
-
 
 
 #-----------------------------------------------------------------------------------
-#Transformer model 
-def get_registered_Transformer_model(in_vocab_size, out_vocab_size, dim_in, dim_key, heads, dim_internal, copies, lr, start, end, optimizer = "sgd", device = torch.device("cuda" if torch.cuda.is_available() else "cpu")):
-    attention_block, FF_block = lay.get_coder_blocks(dim_in, dim_key, heads, dim_internal)
-    transformer = lay.TransformerLayer(attention_block, FF_block, copies).to(device)
-    position_enc = lay.Positional_enc(dim_in, max_dim= 5000).to(device)
-    linear = lay.linear_layer((dim_in, out_vocab_size, False, False)).to(device)
-    enc_embedding=nn.Embedding(in_vocab_size, dim_in).to(device)
-    dec_embedding=nn.Embedding(out_vocab_size, dim_in).to(device)
+#GET TRANSFORMER BUILDING BLOCKS
+#-----------------------------------------------------------------------------------
+def get_circuits(state): #state is a class containing the NN and data hyperparameters
+    p=state.parameters
+    att_hyperparams = (p.d_model, p.d_key, p.nheads)
+    ff_hyperparams = [(p.d_model, p.d_hid, True, True), (p.d_hid, p.d_model, True, False)]
+    return lay.attention(att_hyperparams, p.d_model, p.attention_dropout, p.resnorm_dropout).to(state.device), lay.FeedForward(ff_hyperparams, p.d_model, p.feedforward_dropout, p.resnorm_dropout).to(state.device)
+         
 
-    model = lay.Transformer_model(position_enc, enc_embedding, dec_embedding, transformer, linear, start, end).to(device)
-    #initializing according to the transformer paper
-    for p in model.parameters(): 
-        if p.dim() > 1:
-            nn.init.xavier_uniform_(p)
+def get_transformer_parts(state): #state is a class containing the NN and data hyperparameters
+    p= state.parameters
+    att, ff = get_circuits(state)
+    
+    class TransformerParts:
+        attention = att
+        feedforward = ff
+        encoder = lay.Encoder(p.ntokens, p.d_model, p.nlayers, attention, feedforward).to(state.device)
+        decoder = lay.Decoder(p.ntokens, p.d_model, p.nlayers, attention, feedforward).to(state.device)
+        linear = lay.linear_layer((p.d_model, p.ntokens_out, False, False)).to(state.device)
+    return TransformerParts()
 
-    if optimizer == "adam":
-        opt = optim.Adam(model.parameters(), lr, betas=(0.9, 0.98), eps=1e-9)
-    elif optimizer == "sgd":
-        opt = optim.SGD(model.parameters(), lr)
+
+
+#-----------------------------------------------------------------------------------
+#GET OPTIMIZER AND SCHEDULER
+#-----------------------------------------------------------------------------------
+def get_optimizer(state, model):
+    if state.training.optimizer == "adam":
+        opt = optim.Adam(model.parameters(), state.training.lr, betas=(0.9, 0.98), eps=1e-9)
+    elif state.training.optimizer == "sgd":
+        opt = optim.SGD(model.parameters(), state.training.lr)
     else:
         print("Optimizer choice not recognized")
     
-    return model, opt 
-
+    scheduler = torch.optim.lr_scheduler.LambdaLR(opt, state.training.schedule)
+    return opt, scheduler
 
 
 #-----------------------------------------------------------------------------------
@@ -65,23 +60,17 @@ def learning_rate_function(model_size, factor, warmup_steps):
 def learning_rate_step(factor, drop, time):
     return lambda epoch : factor/(drop**(epoch//time))
 
+
+
 #-----------------------------------------------------------------------------------
-# class for model operations 
-# USE .pt FOR SAVING MODELS!! The other methods seem to generate small errors in the saved tensors that ruin saved network performance.
-class NN_operating_tools(mt.Model_training, nn.Module):
-    def __init__(self, model, opt, learning_rate_schedule=None, saved_model=None): #learning_rate_schedule must be a lambda function
+#NETWORK FUNCTIONS
+#-----------------------------------------------------------------------------------
+class Network_functions(nn.Module):
+    def __init__(self, model, load_saved=None): #learning_rate_schedule must be a lambda function
         nn.Module.__init__(self)
         self.model = model
-        self.opt =opt
-        if learning_rate_schedule is not None:
-            self.scheduler = torch.optim.lr_scheduler.LambdaLR(self.opt, learning_rate_schedule)
-        else:
-            self.scheduler =None
-        self.loss = nn.CrossEntropyLoss()
-        mt.Model_training.__init__(self, model, opt, self.loss)
-
-        if saved_model is not None:
-            self.load_model(saved_model)
+        if load_saved is not None:
+            self.load_model(load_saved)
 
     
     def load_model(self, saved_model):
@@ -142,21 +131,3 @@ class NN_operating_tools(mt.Model_training, nn.Module):
 
 
 
-    #-----------------------------------------------------------------------------------
-#Transformer model NOT registered with nn.Module --parameters are collected manually using custom "parameters" class ---I was just playing around
-#def get_Transformer_model(in_vocab_size, out_vocab_size, dim_in, dim_key, heads, dim_internal, copies, lr):
-#    attention_block, FF_block = lay.get_coder_blocks(dim_in, dim_key, heads, dim_internal)
-#    transformer = lay.TransformerLayer(attention_block, FF_block, copies)
-#    position_enc = lay.Positional_enc(dim_in, max_dim= 5000)
-#    linear = lay.linear_layer((dim_in, out_vocab_size, False, False))
-#    enc_embedding=nn.Embedding(in_vocab_size, dim_in)
-#    dec_embedding=nn.Embedding(out_vocab_size, dim_in)
-
-#    model = lay.Transformer_model(position_enc, enc_embedding, dec_embedding, transformer, linear)
-    #initializing according to the transformer paper
-    #for p in model.parameters(): 
-    #    if p.dim() > 1:
-    #        nn.init.xavier_uniform_(p)
-
-#    opt = optim.SGD(model.parameters(), lr)
-#    return model, opt 
