@@ -21,13 +21,26 @@ class Network_state:
         attention_dropout =0.1
         feedforward_dropout =0.
         resnorm_dropout =0.1
-    
+        network = "encoder"
+
+
     class training:
         lr = 1.
         batch_size = None
         seq_length = None
         optimizer = "sgd"
         schedule = None
+
+
+def param_count(state):
+    p= state.parameters
+    if p.network == "encoder":
+        return (p.d_model*p.d_key*4* p.nheads* p.nlayers)+ (p.d_model*p.d_hid*2*p.nlayers)
+    elif p.network == "transformer":
+        return 3*(p.d_model*p.d_key*4* p.nheads* p.nlayers)+ 2*(p.d_model*p.d_hid*2*p.nlayers)
+    else:
+        print("Network type not recognized")
+
 
 #-----------------------------------------------------------------------------------
 #BUILD DECORATOR FOR RESIDUAL CONNECTION AND LAYER NORM
