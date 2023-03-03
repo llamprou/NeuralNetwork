@@ -72,6 +72,7 @@ class Network_functions(nn.Module):
         if load_saved is not None:
             self.load_model(load_saved)
 
+
     
     def load_model(self, saved_model):
         dir =os.path.join("saved_models", saved_model)
@@ -120,12 +121,6 @@ class Network_functions(nn.Module):
     def save_npy(self, directory):
         trained_model = [copy.deepcopy(p.detach()).numpy() for p in self.model.parameters()]
         np.save(directory, trained_model)
-
-    def save_csv(self,directory):
-        pass
-
-    def save_pkl(self,directory):
-        pass
 
 
 

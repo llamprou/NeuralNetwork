@@ -2,7 +2,9 @@ import torch
 from torch import nn
 from data import text as txt
 import time
-
+import os
+from tempfile import TemporaryDirectory
+import matplotlib.pyplot as plt
 
 class Model_training(nn.Module):
     def __init__(self, model, opt, loss, scheduler):
@@ -16,12 +18,22 @@ class Model_training(nn.Module):
 
     def forward(self, epochs, data):
         self.data = data
-        for epoch in range(epochs):
-            dt, epoch_loss = self.run_transformer_epoch()
-            print(f"Epoch: {epoch} -- time: {dt} -- loss = {epoch_loss}\n")
-
-            #output = self.evaluate_transformer_output(tokenizer, sample_input)
-            #print(output)
+        self.test_loss = []
+        self.train_loss = []
+        best_loss = 10**5
+        with TemporaryDirectory() as tempdir:
+            best_model_path = os.path.join(tempdir, "best_model.pt")
+            for epoch in range(epochs):
+                t1= time.time()
+                self.run_transformer_epoch()
+                t2= time.time() 
+                epoch_test_loss = self.evaluate()
+                print(f"Epoch: {epoch} | time: {t2-t1:5.2f} | test_loss = {epoch_test_loss:5.2f}\n")
+                if epoch_test_loss< best_loss:
+                    best_loss = epoch_test_loss
+                    torch.save(self.model.state_dict(), best_model_path)
+            self.model.load_state_dict(torch.load(best_model_path))
+        self.plot_loss()
         self.data = None
 
 
@@ -29,12 +41,10 @@ class Model_training(nn.Module):
         self.model.train()
         train_iterator = iter(self.data.train_dataloader)
         total_loss =0
-        t1= time.time()
         k = 0
         for input_batch, output_batch in train_iterator:
             t_prev = time.time()
             out_prob = self.model(*input_batch)
-            
             loss = self.loss(out_prob.view(-1,out_prob.size(-1)), output_batch.reshape(-1))
             total_loss += loss.item()
             
@@ -45,16 +55,32 @@ class Model_training(nn.Module):
             
             k+=1
             lr = self.scheduler.get_last_lr()[0]
-            if k%100 ==0:
-              print(f"Batch {k} -- lr = {lr} -- time = {time.time()-t_prev} -- loss {loss}")
+            if k%200 ==0:
+                self.train_loss.append(total_loss/200)
+                print(f"Batch {k} | lr = {lr} | time = {(time.time()-t_prev)* 5:5.2f} | train_loss {total_loss/200:5.2f}")
+                total_loss =0
         self.scheduler.step()
-        t2= time.time() 
-        return t2-t1, total_loss   
+        
 
 
-    def evaluate_transformer_output(self, sample_input):
+    def evaluate(self):
         self.model.eval()
-        text_instance_encoded = self.model.autoregression(sample_input, 62)
+        test_iterator = iter(self.data.test_dataloader)
+        total_loss =0
+        k=1
+        for input_batch, output_batch in test_iterator:
+            out_prob = self.model(*input_batch)
+            loss = self.loss(out_prob.view(-1, out_prob.size(-1)), output_batch.reshape(-1))
+            total_loss += loss.item()
+            k+=1
+        self.test_loss.append(total_loss/k)
+        return total_loss/k
+
+
+
+    def evaluate_autoregression(self, sample_input, length=40):
+        self.model.eval()
+        text_instance_encoded = self.model.autoregression(sample_input, length)
         if self.tokenizer is not None:
             output = self.data.tokenizer.text_decoding(text_instance_encoded)
         else:
@@ -62,15 +88,22 @@ class Model_training(nn.Module):
         return output
     
 
+    def plot_loss(self):
+        plt.figure(figsize=(9,3))
+        
+        plt.subplot(1,2,1)
+        plt.plot([n for n in range(len(self.train_loss))], self.train_loss, "ro")
+        plt.ylabel("training loss")
+        plt.xlabel("batch/200")
+        
+        plt.subplot(1,2,2)
+        plt.plot([n for n in range(len(self.test_loss))], self.test_loss, "ro")
+        plt.ylabel("test loss")
+        plt.xlabel("epoch")
+        
+        plt.show()
+
+
 
 
             
-            #compute loss on test data
-            #if test_dataloader is not None:
-            #    test_iterator = iter(test_dataloader)
-            #    accuracy=0
-            #    with torch.no_grad():
-            #        self.model.eval()
-            #        for exp, pred in test_iterator:
-            #            accuracy += self.evaluate((exp, pred)) #Has not been defined yet
-            #    print(f"Epoch {epoch} achieved accuracy {accuracy/len(test_dataloader)}")

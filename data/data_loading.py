@@ -35,12 +35,14 @@ def process_data(train_iter, coders_cls, state, network = "transformer"):
     coders = coders_cls(train_iter)  #generates vocab, contains tokenizer, text encoders and decoders
     text_data = " ".join(list(item for item in train_iter))  #merges text items of Wikitext2 generator to form single text
     train_data = coders.text_encoding(text_data).view(-1).to(state.device)  #encodes text into flat tensor and sends it to device
-    return coders, get_dataloader(train_data, tr.seq_length, tr.batch_size, network) 
+    train_dl, test_dl = get_dataloaders(train_data, tr.seq_length, tr.batch_size, tr.data_fraction, network) 
+    return coders, train_dl, test_dl
 
-def get_dataloader(data, seq_length, batch_size, network):
+def get_dataloaders(data, seq_length, batch_size, data_fraction, network):
     data = data[:(len(data)//seq_length)*seq_length].view(-1,seq_length) #organizes flat data tensor to fixed-length sequences
-    dl = get_encoder_dataloader(data, data, batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data, data, batch_size, shuffle_batch=True)
-    return dl 
+    train_dl = get_encoder_dataloader(data[:int(data.size(0)*data_fraction),:], data[:int(data.size(0)*data_fraction),:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[:int(data.size(0)*data_fraction),:], data[:int(data.size(0)*data_fraction),:], batch_size, shuffle_batch=True)
+    test_dl = get_encoder_dataloader(data[int(data.size(0)*data_fraction):,:], data[int(data.size(0)*data_fraction):,:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[int(data.size(0)*data_fraction):,:], data[int(data.size(0)*data_fraction):,:], batch_size, shuffle_batch=True)
+    return train_dl, test_dl
 
 
 
