@@ -8,10 +8,11 @@ import random
 #CLASS FOR STORING INPUT TEXT ITERATOR
 #------------------------------------------------------------------------------------
 class Data:
-    tokenizer = None
-    train_dataloader= None
-    test_dataloader = None
-    sample_input = None
+    def __init__(self):
+      self.tokenizer = None
+      self.train_dataloader= None
+      self.test_dataloader = None
+      self.sample_input = None
 
     def encode(self, input):
       if self.tokenizer is not None:
@@ -35,13 +36,13 @@ def process_data(train_iter, coders_cls, state, network = "transformer"):
     coders = coders_cls(train_iter)  #generates vocab, contains tokenizer, text encoders and decoders
     text_data = " ".join(list(item for item in train_iter))  #merges text items of Wikitext2 generator to form single text
     train_data = coders.text_encoding(text_data).view(-1).to(state.device)  #encodes text into flat tensor and sends it to device
-    train_dl, test_dl = get_dataloaders(train_data, tr.seq_length, tr.batch_size, tr.data_fraction, network) 
+    train_dl, test_dl = get_dataloaders(train_data[:int(train_data.size(0)*tr.data_fraction)], tr.seq_length, tr.batch_size, tr.data_split, network) 
     return coders, train_dl, test_dl
 
-def get_dataloaders(data, seq_length, batch_size, data_fraction, network):
+def get_dataloaders(data, seq_length, batch_size, data_split, network):
     data = data[:(len(data)//seq_length)*seq_length].view(-1,seq_length) #organizes flat data tensor to fixed-length sequences
-    train_dl = get_encoder_dataloader(data[:int(data.size(0)*data_fraction),:], data[:int(data.size(0)*data_fraction),:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[:int(data.size(0)*data_fraction),:], data[:int(data.size(0)*data_fraction),:], batch_size, shuffle_batch=True)
-    test_dl = get_encoder_dataloader(data[int(data.size(0)*data_fraction):,:], data[int(data.size(0)*data_fraction):,:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[int(data.size(0)*data_fraction):,:], data[int(data.size(0)*data_fraction):,:], batch_size, shuffle_batch=True)
+    train_dl = get_encoder_dataloader(data[:int(data.size(0)*data_split),:], data[:int(data.size(0)*data_split),:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[:int(data.size(0)*data_split),:], data[:int(data.size(0)*data_split),:], batch_size, shuffle_batch=True)
+    test_dl = get_encoder_dataloader(data[int(data.size(0)*data_split):,:], data[int(data.size(0)*data_split):,:], batch_size, shuffle_batch=True) if network == "encoder" else get_tranformer_dataloader(data[int(data.size(0)*data_split):,:], data[int(data.size(0)*data_split):,:], batch_size, shuffle_batch=True)
     return train_dl, test_dl
 
 

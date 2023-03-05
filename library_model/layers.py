@@ -8,28 +8,35 @@ import math
 #A CLASS TO CONTAIN THE NETWORK STATE
 #-----------------------------------------------------------------------------------
 class Network_state:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu" )
-    
-    class parameters:
-        ntokens = None
-        ntokens_out = None
-        d_model = None
-        nheads = None
-        d_key = None
-        d_hid = None
-        nlayers = None
-        attention_dropout =0.1
-        feedforward_dropout =0.
-        resnorm_dropout =0.1
-        network = "encoder"
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu" )
+        self.parameters = self.parameters_class()
+        self.training = self.training_class()
+
+    class parameters_class:
+        def __init__(self):
+            self.ntokens = None
+            self.ntokens_out = None
+            self.d_model = None
+            self.nheads = None
+            self.d_key = None
+            self.d_hid = None
+            self.nlayers = None
+            self.attention_dropout =0.1
+            self.feedforward_dropout =0.
+            self.resnorm_dropout =0.1
+            self.network = "encoder"
 
 
-    class training:
-        lr = 1.
-        batch_size = None
-        seq_length = None
-        optimizer = "sgd"
-        schedule = None
+    class training_class:
+        def __init__(self):
+            self.lr = 1.
+            self.batch_size = None
+            self.seq_length = None
+            self.optimizer = "sgd"
+            self.schedule = None
+            self.data_split = 0.8
+            self.data_fraction = 1.
 
 
 def param_count(state):

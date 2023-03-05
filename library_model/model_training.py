@@ -13,6 +13,7 @@ class Model_training(nn.Module):
         self.opt =opt
         self.loss = loss
         self.scheduler = scheduler
+        self.min_loss = None
 
     
 
@@ -34,15 +35,16 @@ class Model_training(nn.Module):
                     torch.save(self.model.state_dict(), best_model_path)
             self.model.load_state_dict(torch.load(best_model_path))
         self.plot_loss()
+        self.min_loss = min(self.test_loss)
         self.data = None
 
 
     def run_transformer_epoch(self):
-        self.model.train()
         train_iterator = iter(self.data.train_dataloader)
         total_loss =0
         k = 0
         for input_batch, output_batch in train_iterator:
+            self.model.train()
             t_prev = time.time()
             out_prob = self.model(*input_batch)
             loss = self.loss(out_prob.view(-1,out_prob.size(-1)), output_batch.reshape(-1))
@@ -59,6 +61,8 @@ class Model_training(nn.Module):
                 self.train_loss.append(total_loss/200)
                 print(f"Batch {k} | lr = {lr} | time = {(time.time()-t_prev)* 5:5.2f} | train_loss {total_loss/200:5.2f}")
                 total_loss =0
+            if k%400 ==0:
+                _ = self.evaluate()
         self.scheduler.step()
         
 
@@ -77,7 +81,7 @@ class Model_training(nn.Module):
         return total_loss/k
 
 
-
+    #fix
     def evaluate_autoregression(self, sample_input, length=40):
         self.model.eval()
         text_instance_encoded = self.model.autoregression(sample_input, length)

@@ -53,12 +53,16 @@ def get_optimizer(state, model):
 
 
 #-----------------------------------------------------------------------------------
-# example of a learning rate schedule used in Annotated Transformer
+# SOME STANDARD SCHEDULES
 def learning_rate_function(model_size, factor, warmup_steps):
     return lambda epoch : factor* (model_size)**(-0.5) * min((epoch+1)**(-0.5), (epoch+1) * (warmup_steps)**(-1.5)) 
 
 def learning_rate_step(factor, drop, time):
     return lambda epoch : factor/(drop**(epoch//time))
+
+#fix
+def learning_rate_cosine(factor, length, finalLR):
+    return lambda step : factor *torch.cos(step/length*3.14) +finalLR
 
 
 
