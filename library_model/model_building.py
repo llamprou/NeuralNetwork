@@ -60,9 +60,9 @@ def learning_rate_function(model_size, factor, warmup_steps):
 def learning_rate_step(factor, drop, time):
     return lambda epoch : factor/(drop**(epoch//time))
 
-#fix
+
 def learning_rate_cosine(factor, length, finalLR):
-    return lambda step : factor *torch.cos(step/length*3.14) +finalLR
+    return lambda step : factor *torch.cos(torch.tensor(step/length*3.14)) +finalLR
 
 
 

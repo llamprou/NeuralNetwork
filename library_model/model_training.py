@@ -59,11 +59,12 @@ class Model_training(nn.Module):
             lr = self.scheduler.get_last_lr()[0]
             if k%200 ==0:
                 self.train_loss.append(total_loss/200)
-                print(f"Batch {k} | lr = {lr} | time = {(time.time()-t_prev)* 5:5.2f} | train_loss {total_loss/200:5.2f}")
+                print(f"Batch {k} | lr = {lr:.3f} | time = {(time.time()-t_prev)* 5:5.2f} | train_loss {total_loss/200:5.2f}")
                 total_loss =0
             if k%400 ==0:
                 _ = self.evaluate()
-        self.scheduler.step()
+            self.scheduler.step()
+        #self.scheduler.step()
         
 
 
