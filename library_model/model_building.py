@@ -62,7 +62,7 @@ def learning_rate_step(factor, drop, time):
 
 
 def learning_rate_cosine(factor, length, finalLR):
-    return lambda step : factor *torch.cos(torch.tensor(step/length*3.14)) +finalLR
+    return lambda step : (factor/2) *torch.cos(torch.tensor(step/length*3.14)+1) +finalLR
 
 
 
