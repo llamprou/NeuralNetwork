@@ -104,7 +104,7 @@ class Model_training(nn.Module):
         plt.subplot(1,2,2)
         plt.plot([n for n in range(len(self.test_loss))], self.test_loss, "ro")
         plt.ylabel("test loss")
-        plt.xlabel("epoch")
+        plt.xlabel("batch/400")
         
         plt.show()
 
