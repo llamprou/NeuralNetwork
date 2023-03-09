@@ -190,4 +190,4 @@ class CNN_training(nn.Module):
       dt, _ = self.run_epoch()
       a = self.evaluate()
       print(f"Epoch: {epoch} | time: {dt:.2f} -- test loss = {self.test_loss[-1]:.2f} -- accuracy = {a:.2f}\n")
-      self.plot_loss()      
+    self.plot_loss()      
