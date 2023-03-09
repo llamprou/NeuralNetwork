@@ -10,7 +10,27 @@ import torch.optim as optim
 from library_model import layers as lay
 import copy
 
+#-----------------------------------------------------------------------------------
+#GET CONVOLUTIONAL NETWORK
+#-----------------------------------------------------------------------------------
+class Convolutional(nn.Module):
+    def __init__(self, state):
+        super().__init__()
+        p = state.parameters
+        self.convlayers = nn.ModuleList([lay.ConvPool(*param.values()) for param in p.convlayers])
+        self.linearlayers = nn.ModuleList([lay.linear_layer(tuple(param.values())) for param in p.linearlayers])
+        self.dropout = nn.Dropout(p.dropout)
 
+    def forward(self, input):
+        dims = (int(input.size(-2)), int(input.size(-1)))
+        out = input
+        for layer in self.convlayers:
+            out, dims = layer(out, *dims)
+        out = self.dropout(out).view(out.size(0), -1)
+        for layer in self.linearlayers:
+            out = layer(out)
+        return out
+        
 
 
 #-----------------------------------------------------------------------------------
@@ -63,6 +83,7 @@ def learning_rate_step(factor, drop, time):
 
 def learning_rate_cosine(factor, length, finalLR):
     return lambda step : (factor/2) *(torch.cos(torch.tensor(step/length*3.14))+1) +finalLR
+
 
 
 

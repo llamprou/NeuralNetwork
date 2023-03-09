@@ -110,5 +110,84 @@ class Model_training(nn.Module):
 
 
 
+class CNN_training(nn.Module):
+  def __init__(self, data, state, model, opt, scheduler):
+    super().__init__()
+    self.d = data
+    self.m = model
+    self.s = state
+    self.criterion = nn.CrossEntropyLoss()
+    self.opt = opt
+    self.scheduler = scheduler
+    self.train_loss =[]
+    self.test_loss =[]
 
-            
+  def run_epoch(self):
+    self.m.train()
+    train_iterator = iter(self.d.train_dataloader)
+    total_loss =0
+    k = 0
+    for input_batch, output_batch in train_iterator:
+      t1 = time.time()
+      out_prob = self.m(input_batch.to(self.s.device))
+      out_true = torch.argmax(output_batch, dim=-1).to(self.s.device)
+      loss = self.criterion(out_prob.view(-1, out_prob.size(-1)), out_true)
+      total_loss += loss.item()
+      
+      self.opt.zero_grad()
+      loss.backward()
+      torch.nn.utils.clip_grad_norm_(self.m.parameters(), 0.5) #prevents blow-ups of backpropagated derivatives
+      self.opt.step()
+      
+      k+=1
+      lr = self.scheduler.get_last_lr()[0]
+      if k%200 ==0:
+        self.train_loss.append(total_loss/200)
+        print(f"Batch {k} | lr = {lr:.2f} | time = {time.time()-t1:5.3} | train loss {total_loss/200:.2f}")
+        total_loss =0
+      if k%400 ==0:
+        _ = self.evaluate()
+      self.scheduler.step()
+    t2= time.time() 
+    return t2-t1, total_loss   
+
+  def evaluate(self):
+    self.m.eval()
+    test_iter = iter(self.d.test_dataloader)
+    accuracy =0
+    total_loss = 0
+    number = 1
+    for Xt, yt in test_iter:
+      if (number < 20):
+        out = self.m(Xt.to(self.s.device))
+        out_true = torch.argmax(yt, dim=-1).to(self.s.device)
+        loss = self.criterion(out.view(-1, out.size(-1)), out_true)
+        total_loss += loss.item()
+        out_pred = torch.argmax(out, dim=-1)
+        number +=1
+        accuracy += (sum(out_pred.view(-1)==out_true)/len(out_pred.view(-1))).item()
+    self.test_loss.append(total_loss/number)
+    return accuracy/number
+  
+  def plot_loss(self):
+    plt.figure(figsize=(9,3))
+    
+    plt.subplot(1,2,1)
+    plt.plot(range(len(self.train_loss)), self.train_loss, "ro")
+    plt.ylabel("training loss")
+    plt.xlabel("batch/200")
+    
+    plt.subplot(1,2,2)
+    plt.plot(range(len(self.test_loss)), self.test_loss, "ro")
+    plt.ylabel("test loss")
+    plt.xlabel("batch/400")
+    
+    plt.show()
+
+
+  def forward(self, epochs):
+    for epoch in range(epochs):
+      dt, _ = self.run_epoch()
+      a = self.evaluate()
+      print(f"Epoch: {epoch} | time: {dt:.2f} -- test loss = {self.test_loss[-1]:.2f} -- accuracy = {a:.2f}\n")
+      self.plot_loss()      
