@@ -4,7 +4,7 @@ This is the primary project I have been working on for the past few months. I am
 
 I include three notebooks where I:
 
-1) train an efficient convolutional network on the FashionMNIST database mainly for fun,
+1) train an efficient convolutional network on the FashionMNIST  and CIFAR-10 datasets mainly for fun,
 
 2) train a medium-sized (nlayer=2, d_model = 600) transfromer on Wikitext-2 whose performance compares well with the pytorch built-in model
 
