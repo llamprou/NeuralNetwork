@@ -111,7 +111,7 @@ class Model_training(nn.Module):
 
 
 class CNN_training(nn.Module):
-  def __init__(self, data, state, model, opt, scheduler):
+  def __init__(self, data, state, model, opt, scheduler, train_log=200, test_log=400):
     super().__init__()
     self.d = data
     self.m = model
@@ -121,6 +121,8 @@ class CNN_training(nn.Module):
     self.scheduler = scheduler
     self.train_loss =[]
     self.test_loss =[]
+    self.test_log = test_log
+    self.train_log = train_log
 
   def run_epoch(self):
     self.m.train()
@@ -141,11 +143,11 @@ class CNN_training(nn.Module):
       
       k+=1
       lr = self.scheduler.get_last_lr()[0]
-      if k%200 ==0:
-        self.train_loss.append(total_loss/200)
-        print(f"Batch {k} | lr = {lr:.2f} | time = {time.time()-t1:5.3} | train loss {total_loss/200:.2f}")
+      if k%int(self.train_log) ==0:
+        self.train_loss.append(total_loss/self.train_log)
+        print(f"Batch {k} | lr = {lr:.2f} | time = {time.time()-t1:5.3} | train loss {total_loss/self.train_log:.2f}")
         total_loss =0
-      if k%400 ==0:
+      if k%int(self.test_log) ==0:
         _ = self.evaluate()
       self.scheduler.step()
     t2= time.time() 
@@ -175,12 +177,12 @@ class CNN_training(nn.Module):
     plt.subplot(1,2,1)
     plt.plot(range(len(self.train_loss)), self.train_loss, "ro")
     plt.ylabel("training loss")
-    plt.xlabel("batch/200")
+    plt.xlabel("batch/"+str(self.train_log))
     
     plt.subplot(1,2,2)
     plt.plot(range(len(self.test_loss)), self.test_loss, "ro")
     plt.ylabel("test loss")
-    plt.xlabel("batch/400")
+    plt.xlabel("batch/"+str(self.test_log))
     
     plt.show()
 

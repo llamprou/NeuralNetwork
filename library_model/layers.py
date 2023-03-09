@@ -184,7 +184,7 @@ class LayerNorm(nn.Module):
 
 #Convolutional-Pooling class
 class ConvPool(nn.Module):
-    def __init__(self, filter_dim, in_features, out_features, pooling=2.): #stride is set tp 1 and no padding
+    def __init__(self, filter_dim, in_features, out_features, pooling): #stride is set tp 1 and no padding
         super().__init__()
         self.filter_dim, self.indim, self.outdim, self.pool= filter_dim, in_features, out_features, int(pooling)
         self.filter = linear_layer((in_features*(filter_dim**2), out_features, True, False))
