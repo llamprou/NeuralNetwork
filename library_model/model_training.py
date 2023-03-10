@@ -11,7 +11,7 @@ class Records_class:
     self.parameters={p : [] for p in param_logs.keys()}
     self.logs=param_logs
 
-class Training_records(nn.Module):
+class Training_records:
   def __init__(self, train_log, test_log, records):
     self.train_loss = []
     self.test_loss = []
