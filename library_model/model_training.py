@@ -34,7 +34,7 @@ class Training_records:
     if self.records is not None:
       for param in self.records.parameters.keys():
         if step%self.records.logs[param] ==0:
-          self.records.parameters[param] = self.records.parameters[param] +[self.model.state_dict()[param]]
+          self.records.parameters[param] = self.records.parameters[param] +[self.model.state_dict()[param].detach().clone()]
     return loss
 
 
