@@ -193,9 +193,10 @@ class ConvPool(nn.Module):
         self.relu = nn.ReLU()
         self.n_conv = self.dim0-self.filter_dim+1
         self.m_conv = self.dim1-self.filter_dim+1
-        self.isometry = torch.zeros(self.n_conv, self.m_conv, self.filter_dim, self.filter_dim, self.dim0, self.dim1)
+        isometry = torch.zeros(self.n_conv, self.m_conv, self.filter_dim, self.filter_dim, self.dim0, self.dim1)
         i,j,n,m = np.ogrid[:self.n_conv, :self.m_conv, :self.filter_dim, :self.filter_dim]
-        self.isometry[i,j,n,m, i+n, j+m] = 1
+        isometry[i,j,n,m, i+n, j+m] = 1
+        self.register_buffer("isometry", isometry)
 
     def convolution(self, input): #input: (batch_dim, feature_dim, image_dim0*image_dim1), dims = (image_dim0, image_dim1)
         x = input.reshape(-1, int(self.indim), int(self.dim0), int(self.dim1))
