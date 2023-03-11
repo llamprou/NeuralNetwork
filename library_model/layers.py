@@ -31,12 +31,14 @@ class Network_state:
     class training_class:
         def __init__(self):
             self.lr = 1.
+            self.w_decay = 0.
             self.batch_size = None
             self.seq_length = None
             self.optimizer = "sgd"
             self.schedule = None
             self.data_split = 0.8
             self.data_fraction = 1.
+            self.w_decay = 0.
 
 
 def param_count(state):
