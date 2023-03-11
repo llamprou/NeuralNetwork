@@ -74,10 +74,9 @@ class Model_training(nn.Module, Training_records):
                 t1= time.time()
                 self.run_transformer_epoch()
                 t2= time.time() 
-                epoch_test_loss = self.evaluate()
-                print(f"Epoch: {epoch} | time: {t2-t1:5.2f} | test_loss = {epoch_test_loss:5.2f}\n")
-                if epoch_test_loss< best_loss:
-                    best_loss = epoch_test_loss
+                print(f"Epoch: {epoch} | time: {t2-t1:5.2f} | test_loss = {self.test_loss[-1]:5.2f}\n")
+                if self.test_loss[-1]< best_loss:
+                    best_loss = self.test_loss[-1]
                     torch.save(self.model.state_dict(), best_model_path)
             self.model.load_state_dict(torch.load(best_model_path))
         self.plot_loss()
@@ -195,8 +194,7 @@ class CNN_training(nn.Module, Training_records):
   def forward(self, epochs):
     for epoch in range(epochs):
       dt, _ = self.run_epoch()
-      a = self.evaluate()
-      print(f"Epoch: {epoch} | time: {dt:.2f} -- test loss = {self.test_loss[-1]:.2f} -- accuracy = {a:.2f}\n")
+      print(f"Epoch: {epoch} | time: {dt:.2f} -- test loss = {self.test_loss[-1]:.2f} -- accuracy = {self.accuracy[-1]:.2f}\n")
     self.plot_loss()      
 
 
