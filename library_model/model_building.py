@@ -60,11 +60,11 @@ def get_transformer_parts(state): #state is a class containing the NN and data h
 #-----------------------------------------------------------------------------------
 #GET OPTIMIZER AND SCHEDULER
 #-----------------------------------------------------------------------------------
-def get_optimizer(state, model):
+def get_optimizer(state, model, weight_decay  = 0.):
     if state.training.optimizer == "adam":
-        opt = optim.Adam(model.parameters(), state.training.lr, betas=(0.9, 0.98), eps=1e-9)
+        opt = optim.Adam(model.parameters(), state.training.lr, betas=(0.9, 0.98), eps=1e-9, weight_decay=weight_decay)
     elif state.training.optimizer == "sgd":
-        opt = optim.SGD(model.parameters(), state.training.lr)
+        opt = optim.SGD(model.parameters(), state.training.lr, weight_decay=weight_decay)
     else:
         print("Optimizer choice not recognized")
     
