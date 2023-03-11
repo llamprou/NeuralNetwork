@@ -186,39 +186,36 @@ class LayerNorm(nn.Module):
 
 #Convolutional-Pooling class
 class ConvPool(nn.Module):
-    def __init__(self, filter_dim, in_features, out_features, pooling): #stride is set tp 1 and no padding
+    def __init__(self, dim0, dim1, filter_dim, in_features, out_features, pooling): #stride is set to 1 and no padding
         super().__init__()
-        self.filter_dim, self.indim, self.outdim, self.pool= filter_dim, in_features, out_features, int(pooling)
+        self.dim0, self.dim1, self.filter_dim, self.indim, self.outdim, self.pool= dim0, dim1, filter_dim, in_features, out_features, int(pooling)
         self.filter = linear_layer((in_features*(filter_dim**2), out_features, True, False))
         self.relu = nn.ReLU()
+        self.n_conv = self.dim0-self.filter_dim+1
+        self.m_conv = self.dim1-self.filter_dim+1
+        self.isometry = torch.zeros(self.n_conv, self.m_conv, self.filter_dim, self.filter_dim, self.dim0, self.dim1)
+        i,j,n,m = np.ogrid[:self.n_conv, :self.m_conv, :self.filter_dim, :self.filter_dim]
+        self.isometry[i,j,n,m, i+n, j+m] = 1
 
-    def convolution(self, input, dim0, dim1): #input: (batch_dim, feature_dim, image_dim0*image_dim1), dims = (image_dim0, image_dim1)
-        x = input.transpose(-1,-2).reshape(-1, int(dim0), int(dim1), int(self.indim))
-        w = int(self.filter_dim)
-        output = torch.empty(x.size(0), (dim0-w +1), (dim1-w+1), self.indim*(w**2)).to(x)
-        
-        #A single small for loop over the size of the filter_dim/stride
-        for i in range(w):
-            for j in range(w):
-                y = x[:,i:,j:] #make a step equal to the stride=1
-                y = y[:,:(y.size(1)//w)*w, :(y.size(2)//w)*w] #truncate to right size
-                output[:, i::w, j::w,:]= y.view(-1, y.size(1)//w, w, y.size(2)//w, w, self.indim).transpose(-3,-4).reshape(-1, y.size(1)//w, y.size(2)//w, self.indim*(w**2)) 
-        return self.filter(output).view(output.size(0), -1, self.outdim).transpose(-1,-2)
+    def convolution(self, input): #input: (batch_dim, feature_dim, image_dim0*image_dim1), dims = (image_dim0, image_dim1)
+        x = input.reshape(-1, int(self.indim), int(self.dim0), int(self.dim1))
+        x = torch.tensordot(x, self.isometry, dims= ([-1,-2],[-1,-2]))
+        x= x.view(x.size(0), x.size(1), self.n_conv*self.m_conv, self.filter_dim**2).transpose(-2,-3).reshape(x.size(0), self.n_conv*self.m_conv, -1)
+        return self.filter(x).transpose(-1,-2)
 
-    def pooling(self, input, dim0, dim1):
+    def pooling(self, input):
         w = int(self.pool)
-        x = (input.view(-1, self.outdim, dim0, dim1))[:,:, :int((dim0//w)*w), :int((dim1//w)*w)] #pad down to appopriate size
-        x = x.view(-1, self.outdim, dim0//w, w, dim1//w, w).transpose(-2,-3).reshape(-1, self.outdim, dim0//w, dim1//w, w**2)
+        x = (input.view(-1, self.outdim, self.n_conv, self.m_conv))[:,:, :int((self.n_conv//w)*w), :int((self.m_conv//w)*w)] #pad down to appopriate size
+        x = x.view(-1, self.outdim, self.n_conv//w, w, self.m_conv//w, w).transpose(-2,-3).reshape(-1, self.outdim, self.n_conv//w, self.m_conv//w, w**2)
         x_pool, _ = torch.max(x, dim=-1)
         return x_pool
 
 
-    def forward(self, input, dim0, dim1): #flattened input
-        out = self.convolution(input, dim0, dim1)
-        new_dim0, new_dim1 = (dim0-self.filter_dim +1), (dim1-self.filter_dim +1)
+    def forward(self, input): #flattened input
+        out = self.relu(self.convolution(input))
         if self.pool>1:
-            out = self.pooling(out, new_dim0, new_dim1)
-        return out.view(out.size(0), out.size(1),-1), (new_dim0//self.pool, new_dim1//self.pool)
+            out = self.pooling(out)
+        return out.view(out.size(0), out.size(1),-1)
 
 
 
@@ -334,3 +331,40 @@ class Transformer(nn.Module):
 
 
 
+
+
+#Convolutional-Pooling class
+"""class ConvPool(nn.Module):
+    def __init__(self, filter_dim, in_features, out_features, pooling): #stride is set tp 1 and no padding
+        super().__init__()
+        self.filter_dim, self.indim, self.outdim, self.pool= filter_dim, in_features, out_features, int(pooling)
+        self.filter = linear_layer((in_features*(filter_dim**2), out_features, True, False))
+        self.relu = nn.ReLU()
+
+    def convolution(self, input, dim0, dim1): #input: (batch_dim, feature_dim, image_dim0*image_dim1), dims = (image_dim0, image_dim1)
+        x = input.transpose(-1,-2).reshape(-1, int(dim0), int(dim1), int(self.indim))
+        w = int(self.filter_dim)
+        output = torch.empty(x.size(0), (dim0-w +1), (dim1-w+1), self.indim*(w**2)).to(x)
+        
+        #A single small for loop over the size of the filter_dim/stride
+        for i in range(w):
+            for j in range(w):
+                y = x[:,i:,j:] #make a step equal to the stride=1
+                y = y[:,:(y.size(1)//w)*w, :(y.size(2)//w)*w] #truncate to right size
+                output[:, i::w, j::w,:]= y.view(-1, y.size(1)//w, w, y.size(2)//w, w, self.indim).transpose(-3,-4).reshape(-1, y.size(1)//w, y.size(2)//w, self.indim*(w**2)) 
+        return self.filter(output).view(output.size(0), -1, self.outdim).transpose(-1,-2)
+
+    def pooling(self, input, dim0, dim1):
+        w = int(self.pool)
+        x = (input.view(-1, self.outdim, dim0, dim1))[:,:, :int((dim0//w)*w), :int((dim1//w)*w)] #pad down to appopriate size
+        x = x.view(-1, self.outdim, dim0//w, w, dim1//w, w).transpose(-2,-3).reshape(-1, self.outdim, dim0//w, dim1//w, w**2)
+        x_pool, _ = torch.max(x, dim=-1)
+        return x_pool
+
+
+    def forward(self, input, dim0, dim1): #flattened input
+        out = self.relu(self.convolution(input, dim0, dim1))
+        new_dim0, new_dim1 = (dim0-self.filter_dim +1), (dim1-self.filter_dim +1)
+        if self.pool>1:
+            out = self.pooling(out, new_dim0, new_dim1)
+        return out.view(out.size(0), out.size(1),-1), (new_dim0//self.pool, new_dim1//self.pool)"""

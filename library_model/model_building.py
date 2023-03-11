@@ -22,10 +22,9 @@ class Convolutional(nn.Module):
         self.dropout = nn.Dropout(p.dropout)
 
     def forward(self, input):
-        dims = (int(input.size(-2)), int(input.size(-1)))
         out = input
         for layer in self.convlayers:
-            out, dims = layer(out, *dims)
+            out = layer(out)
         out = self.dropout(out).view(out.size(0), -1)
         for layer in self.linearlayers:
             out = layer(out)
