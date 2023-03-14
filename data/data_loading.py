@@ -1,7 +1,10 @@
 import torch
 import numpy as np
 import random
-
+import os
+import tarfile
+import pickle
+import urllib.request
 
 
 #------------------------------------------------------------------------------------
@@ -27,6 +30,62 @@ class Data:
         print("No tokenizer selection")
 
 
+
+#------------------------------------------------------------------------------------
+#CLASS FOR DOWNLOADING DATASETS FROM THE INTERNET AND LOADING SAVED DATASETS
+#------------------------------------------------------------------------------------
+
+class Dataset_loading:
+  def __init__(self):
+    self.path = "/content/drive/My Drive/Colab Notebooks/NeuralNetwork/datasets"
+    if os.path.exists(self.path) ==False:
+      os.mkdir(self.path) 
+
+  #method for different file downloads
+  def download_files(self, url, folder_name):  
+    #define functions for different types of file downloads  
+    def download_tar_gz():
+      target_folder = os.path.join(self.path, folder_name)
+      if os.path.exists(target_folder)==False:
+        os.mkdir(target_folder)
+      fstream = urllib.request.urlopen(url)
+      data_files = tarfile.open(fileobj= fstream, mode = "r:gz")
+      data_files.extractall(target_folder)
+    
+    #dictionary for calling the appropriate download function
+    types_dict = {".tar.gz" : download_tar_gz}
+    file_name = url.rsplit("/", 1)[1]
+    idx = file_name.find(".")
+    types_dict[file_name[idx:]]() 
+
+
+  #method for loading saved datasets
+  def load_files(self, folder, target_files, file_type, encoding, data_transform=lambda x: x, label_transform=lambda x: x):
+    #define functions for opening different types of files 
+    def unpickle(target_file):
+      with open(target_file, "rb") as f:
+        data_dict = pickle.load(f, encoding=encoding)
+      return data_dict
+
+    types_dict = {"pickle" : unpickle}
+    data = []
+    labels = []
+    for f in target_files:
+      tfile = os.path.join(self.path, folder, f)
+      data_dict = types_dict[file_type](tfile)
+      data.append(data_dict["data"])
+      labels.append(data_dict["labels"])
+    return data_transform(data), label_transform(labels)
+
+  @staticmethod
+  def to_torch_and_shape(*shape):
+    def transform(input):
+      output = list(map(lambda x: torch.tensor(x).reshape(-1, *shape) , input))
+      output = torch.cat(output, dim = 0)
+      return output
+    return transform
+
+    
 
 #------------------------------------------------------------------------------------
 #HELPER FUNCTIONS FOR PROCESSING INPUT TEXT ITERATOR
