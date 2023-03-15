@@ -63,7 +63,9 @@ class MSELoss(object):
   def forward(self, input, target):
     input = input
     deriv = input.value - target
-    output= Parameter(torch.sum(deriv.pow(2).reshape(-1))/target.size(0), grad_on =True)
+    output= Parameter(torch.sum(deriv.pow(2).reshape(-1)), grad_on =True)
+    if self.mode == "mean":
+      output.value = output.value/target.size(0)
     output.prev_grad_nodes=[input] if input.grad_on else []
     output.grad_fn = [MSELoss.backward(deriv)]
 
