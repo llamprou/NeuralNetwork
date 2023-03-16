@@ -13,7 +13,7 @@ class Parameter(object):
     def __call__(self):
       return self.value
 
-    def backward(self):
+    def backward(self): #this only works for tree-like computational graphs. To handle the general case I need to topologically sort the graph first.
       for param, gradfn in zip(self.prev_grad_nodes, self.grad_fn):
         if param is not None and gradfn is not None:
           param.grad = gradfn(self.grad) if param.grad is None else param.grad + gradfn(self.grad)
