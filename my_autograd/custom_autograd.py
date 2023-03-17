@@ -13,14 +13,39 @@ class Parameter(object):
     def __call__(self):
       return self.value
 
-    def backward(self): #this only works for tree-like computational graphs. To handle the general case I need to topologically sort the graph first.
-      for param, gradfn in zip(self.prev_grad_nodes, self.grad_fn):
-        if param is not None and gradfn is not None:
-          param.grad = gradfn(self.grad) if param.grad is None else param.grad + gradfn(self.grad)
-      for param in self.prev_grad_nodes:
-        if param is not None:
-          param.backward()
+    def backward(self): 
+      graph = self.make_computational_graph(set(self.prev_grad_nodes), {self : self.prev_grad_nodes})
+      sorted_graph = self.topological_sort(graph, []) #this is a list of the model parameters ordered according to which derivatives should be computed first
+      for param in sorted_graph:
+        for child, deriv in zip(param.prev_grad_nodes, param.grad_fn):
+          if child is not None and deriv is not None:
+            child.grad = deriv(param.grad) if child.grad is None else child.grad + deriv(self.grad)
 
+
+    def make_computational_graph(self, nodes, graph):
+      if len(nodes) ==0:
+        return graph
+      else:
+        extend_graph ={n : n.prev_grad_nodes for n in nodes if n.prev_grad_nodes != [None]}
+        graph = {**graph, **extend_graph}
+        new_nodes = []
+        for n in extend_graph.values():
+          new_nodes+= n
+        return self.make_computational_graph(set(new_nodes), graph)
+      
+    def topological_sort(self, graph, ordered):
+        if len(graph)==0:
+            return ordered
+        else:
+            values = []
+            for v in graph.values():
+                values.extend(v)
+            for n in graph.keys():
+                if n not in set(values):
+                    ordered.append(n)
+                    break
+            del graph[n]
+            return self.topological_sort(graph, ordered)
 
 
 
@@ -77,3 +102,24 @@ class MSELoss(object):
       return 2*deriv
     return z_grad
     
+
+
+
+"""class Parameter(object):
+    def __init__(self, input, grad_on=False): #dim_in/out are lists
+      self.value = input
+      self.grad_on = grad_on
+      self.grad= None
+      self.prev_grad_nodes=[None]
+      self.grad_fn = [None]
+
+    def __call__(self):
+      return self.value
+
+    def backward(self): #this only works for tree-like computational graphs. To handle the general case I need to topologically sort the graph first.
+      for param, gradfn in zip(self.prev_grad_nodes, self.grad_fn):
+        if param is not None and gradfn is not None:
+          param.grad = gradfn(self.grad) if param.grad is None else param.grad + gradfn(self.grad)
+      for param in self.prev_grad_nodes:
+        if param is not None:
+          param.backward()"""
